@@ -3298,7 +3298,7 @@
           banner.className = 'data-mode-banner';
           bannerTag.className = 'banner-tag real';
           bannerTag.textContent = 'LIVE SYSTEM TELEMETRY (READ-ONLY)';
-          el('bannerExplanation').textContent = 'Connected directly to SQLite WAL Database on port 8085. Uncaptured metrics displayed as "Not recorded".';
+          el('bannerExplanation').textContent = 'Connected directly to Cloud VPS Supabase PostgreSQL Cluster via HTTPS. Real-time school telemetry active.';
           if (modalRealNotice) modalRealNotice.classList.remove('hidden');
           loadRealDataFromBackend();
         }
@@ -3309,14 +3309,19 @@
         }
       }
 
+      const CLOUD_API_BASE = 'https://jungle-volunteers-original-pressing.trycloudflare.com';
+
       async function loadRealDataFromBackend() {
         try {
-          const [resClasses, resTickets] = await Promise.all([
-            fetch('/api/educational/classes'),
-            fetch('/api/educational/comments/list')
+          const sId = (currentSchool || 'NIS').toLowerCase();
+          const [resClasses, resTickets, resUsers] = await Promise.all([
+            fetch(`${CLOUD_API_BASE}/${sId}/classes`),
+            fetch(`${CLOUD_API_BASE}/${sId}/feedback_tickets?order=created_at.desc`),
+            fetch(`${CLOUD_API_BASE}/${sId}/users`)
           ]);
           if (resClasses.ok) realDbClasses = await resClasses.json();
           if (resTickets.ok) realDbTickets = await resTickets.json();
+          if (resUsers.ok) realDbStudents = await resUsers.json();
         } catch (err) {
           console.warn('Real data load error:', err);
         }
@@ -3712,7 +3717,8 @@
         let tickets = [];
         if (currentMode === 'REAL') {
           try {
-            const res = await fetch('/api/educational/comments/list');
+            const sId = (currentSchool || 'NIS').toLowerCase();
+            const res = await fetch(`${CLOUD_API_BASE}/${sId}/feedback_tickets?order=created_at.desc`);
             if (res.ok) tickets = await res.json();
           } catch (_) {
             tickets = [];
@@ -3831,13 +3837,16 @@
         const replyText = inp ? inp.value.trim() : '';
 
         try {
-          const res = await fetch('/api/educational/developer/tickets/update', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+          const sId = (currentSchool || 'NIS').toLowerCase();
+          const res = await fetch(`${CLOUD_API_BASE}/${sId}/feedback_tickets?id=eq.${encodeURIComponent(tid)}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            },
             body: JSON.stringify({
-              ticketId: tid,
               status: newStatus,
-              developerReply: replyText
+              developer_reply: replyText
             })
           });
           if (res.ok) {
